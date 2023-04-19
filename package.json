@@ -1,12 +1,15 @@
 {
-  "name": "snyk-gameday-package",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "start": "node index.js"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC"
+    "name": "snyk-gameday-package",
+    "version": "1.1.0",
+    "description": "",
+    "bin": {
+        "sgpkg": "./bin/sgpkg",
+        "snyk-gameday-package": "./bin/sgpkg",
+        "spm": "./bin/sgpkgpm",
+        "sgpkgpackage": "./bin/sgpkgpm"
+    },
+    "main": "./index.js",
+    "keywords": [],
+    "author": "",
+    "license": "ISC"
 }
