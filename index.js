@@ -21,7 +21,7 @@
 
 /**
  * @module Framework
- * @version 3.4.6
+ * @version 3.4.9
  */
 
 'use strict';
@@ -647,14 +647,14 @@ global.$ACTION = function(schema, model, callback, controller) {
 
 		meta.multiple = meta.op.length > 1;
 		meta.schema = o;
-		meta.validate = meta.method !== 'GET' && meta.method !== 'DELETE';
+		meta.validate = meta.method !== 'GET';
 		F.temporary.other[schema] = meta;
 	}
 
 	if (meta.validate) {
 
 		var req = controller ? controller.req : null;
-		if (meta.method === 'PATCH') {
+		if (meta.method === 'PATCH' || meta.method === 'DELETE') {
 			if (!req)
 				req = {};
 			req.$patch = true;
@@ -752,7 +752,7 @@ function performschema(type, schema, model, options, callback, controller, noval
 			model.$$keys = keys;
 			model.$$controller = controller;
 			model[type](options, callback);
-			if (req && req.$patch && req.method && req.method !== 'PATCH')
+			if (req && req.$patch && req.method && (req.method !== 'PATCH' & req.method !== 'DELETE'))
 				delete req.$patch;
 		}
 	}, null, novalidate, workflow, req);
@@ -956,8 +956,8 @@ function Framework() {
 	var self = this;
 
 	self.$id = null; // F.id ==> property
-	self.version = 3460;
-	self.version_header = '3.4.6';
+	self.version = 3490;
+	self.version_header = '3.4.9';
 	self.version_node = process.version.toString();
 	self.syshash = (__dirname + '-' + Os.hostname() + '-' + Os.platform() + '-' + Os.arch() + '-' + Os.release() + '-' + Os.tmpdir() + JSON.stringify(process.versions)).md5();
 	self.pref = global.PREF;
@@ -6123,6 +6123,8 @@ function parseQueryArgumentsDecode(val) {
 	}
 }
 
+const QUERY_ALLOWED = { '45': 1, '95': 1, 46: 1, '91': 1, '92': 1 };
+
 function parseQueryArguments(str) {
 
 	var obj = {};
@@ -6180,6 +6182,21 @@ function parseQueryArguments(str) {
 					is = true;
 				}
 				continue;
+			}
+
+			if (!is) {
+
+				var can = false;
+
+				if (n > 47 && n < 58)
+					can = true;
+				else if ((n > 64 && n < 91) || (n > 96 && n < 123))
+					can = true;
+				else if (QUERY_ALLOWED[n])
+					can = true;
+
+				if (!can)
+					break;
 			}
 
 			if (n === 43) {
@@ -6265,7 +6282,7 @@ F.onSchema = function(req, route, callback) {
 	} else
 		schema = GETSCHEMA(route.schema[0], route.schema[1]);
 
-	if (req.method === 'PATCH')
+	if (req.method === 'PATCH' || req.method === 'DELETE')
 		req.$patch = true;
 
 	if (schema)
@@ -12562,13 +12579,13 @@ ControllerProto.meta = function() {
 	var self = this;
 
 	if (arguments[0])
-		self.repository[REPOSITORY_META_TITLE] = arguments[0];
+		self.repository[REPOSITORY_META_TITLE] = arguments[0].encode();
 
 	if (arguments[1])
-		self.repository[REPOSITORY_META_DESCRIPTION] = arguments[1];
+		self.repository[REPOSITORY_META_DESCRIPTION] = arguments[1].encode();
 
 	if (arguments[2] && arguments[2].length)
-		self.repository[REPOSITORY_META_KEYWORDS] = arguments[2] instanceof Array ? arguments[2].join(', ') : arguments[2];
+		self.repository[REPOSITORY_META_KEYWORDS] = (arguments[2] instanceof Array ? arguments[2].join(', ') : arguments[2]);
 
 	if (arguments[3])
 		self.repository[REPOSITORY_META_IMAGE] = arguments[3];
@@ -12663,32 +12680,32 @@ ControllerProto.author = function(value) {
 
 ControllerProto.$title = function(value) {
 	if (value)
-		this.repository[REPOSITORY_META_TITLE] = value;
+		this.repository[REPOSITORY_META_TITLE] = value.encode();
 	return '';
 };
 
 ControllerProto.$title2 = function(value) {
 	var current = this.repository[REPOSITORY_META_TITLE];
 	if (value)
-		this.repository[REPOSITORY_META_TITLE] = (current ? current : '') + value;
+		this.repository[REPOSITORY_META_TITLE] = (current ? current : '') + value.encode();
 	return '';
 };
 
 ControllerProto.$description = function(value) {
 	if (value)
-		this.repository[REPOSITORY_META_DESCRIPTION] = value;
+		this.repository[REPOSITORY_META_DESCRIPTION] = value.encode();
 	return '';
 };
 
 ControllerProto.$keywords = function(value) {
 	if (value && value.length)
-		this.repository[REPOSITORY_META_KEYWORDS] = value instanceof Array ? value.join(', ') : value;
+		this.repository[REPOSITORY_META_KEYWORDS] = (value instanceof Array ? value.join(', ') : value).encode();
 	return '';
 };
 
 ControllerProto.$author = function(value) {
 	if (value)
-		this.repository[REPOSITORY_META_AUTHOR] = value;
+		this.repository[REPOSITORY_META_AUTHOR] = value.encode();
 	return '';
 };
 
@@ -13101,7 +13118,7 @@ function querystring_encode(value, def, key) {
 		return querystring_encode(value[0], def) + (tmp ? tmp : '');
 	}
 
-	return value != null ? value instanceof Date ? encodeURIComponent(value.format()) : typeof(value) === 'string' ? encodeURIComponent(value) : value.toString() : def || '';
+	return value != null ? value instanceof Date ? encodeURIComponent(value.format()) : typeof(value) === 'string' ? encodeURIComponent(value) : (value + '') : def || '';
 }
 
 // @{href({ key1: 1, key2: 2 })}
@@ -13131,15 +13148,14 @@ ControllerProto.href = function(key, value) {
 
 			obj[key] = '\0';
 
-			var arr = Object.keys(obj);
-			for (var i = 0, length = arr.length; i < length; i++) {
-				var val = obj[arr[i]];
+			for (var k in obj) {
+				var val = obj[k];
 				if (val !== undefined) {
 					if (val instanceof Array) {
 						for (var j = 0; j < val.length; j++)
-							str += (str ? '&' : '') + arr[i] + '=' + (key === arr[i] ? '\0' : querystring_encode(val[j]));
+							str += (str ? '&' : '') + k + '=' + (key === k ? '\0' : querystring_encode(val[j]));
 					} else
-						str += (str ? '&' : '') + arr[i] + '=' + (key === arr[i] ? '\0' : querystring_encode(val));
+						str += (str ? '&' : '') + k + '=' + (key === k ? '\0' : querystring_encode(val));
 				}
 			}
 			self[cachekey] = str;
@@ -16239,7 +16255,6 @@ function buffer_concat(buffers, length) {
 
 // MIT
 // Written by Jozef Gula
-// Optimized by Peter Sirka
 WebSocketClientProto.$parse = function() {
 
 	var self = this;
@@ -17105,7 +17120,7 @@ function extend_request(PROTO) {
 		var self = this;
 		self.$sgpkg_schema = false;
 
-		if (!self.$sgpkg_route.schema || self.method === 'DELETE')
+		if (!self.$sgpkg_route.schema)
 			return next(self, code);
 
 		if (!self.$sgpkg_route.schema[1]) {

@@ -55,7 +55,7 @@ function u32(buf, o) {
 }
 
 exports.measureGIF = function(buffer) {
-	return { width: buffer[6], height: buffer[8] };
+	return { width: buffer.readInt16LE(6), height: buffer.readInt16LE(8) };
 };
 
 // MIT
@@ -286,7 +286,9 @@ ImageProto.pipe = function(stream, type, options) {
 	}
 
 	!self.builder.length && self.minify();
-	!type && (type = self.outputType);
+
+	if (!type || !SUPPORTEDIMAGES[type])
+		type = self.outputType;
 
 	F.stats.performance.open++;
 	var cmd = spawn(CMD_CONVERT[self.cmdarg], self.arg(self.filename ? wrap(self.filename) : '-', (type ? type + ':' : '') + '-'), SPAWN_OPT);
