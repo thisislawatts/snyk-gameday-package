@@ -1267,7 +1267,7 @@ exports.compile_css = function(value, filename, nomarkup) {
 
 	// Internal markup
 	if (!nomarkup)
-		value = markup(value);
+		value = markup(value, filename);
 
 	if (global.F) {
 		value = modificators(value, filename, 'style');
@@ -1296,7 +1296,7 @@ exports.compile_javascript = function(source, filename, nomarkup) {
 
 	// Internal markup
 	if (!nomarkup)
-		source = markup(source);
+		source = markup(source, filename);
 
 	if (global.F) {
 		source = modificators(source, filename, 'script');
@@ -1955,17 +1955,21 @@ function view_parse(content, minify, filename, controller) {
 						if (!a) {
 							var isMeta = tmp.indexOf('\'meta\'') !== -1;
 							var isHead = tmp.indexOf('\'head\'') !== -1;
-							tmp = tmp.replace(/(\s)?'(meta|head)'(\s|,)+/g, '').replace(/(,,|,\)|\s{2,})/g, '');
+							tmp = tmp.replace(/(\s)?'(meta|head)'(\s|,)?/g, '').replace(/(,,|,\)|\s{2,})/g, '');
 							if (isMeta || isHead) {
 								var tmpimp = '';
 								if (isMeta)
 									tmpimp += (isMeta ? '\'meta\'' : '');
 								if (isHead)
 									tmpimp += (tmpimp ? ',' : '') + (isHead ? '\'head\'' : '');
-								builder += '+self.$import(' + tmpimp + ')';
+								if (tmpimp)
+									builder += '+self.$import(' + tmpimp + ')';
 							}
 						}
-						can = true;
+
+						if (tmp !== 'self.$import()')
+							can = true;
+
 						break;
 					}
 				}
@@ -1973,6 +1977,10 @@ function view_parse(content, minify, filename, controller) {
 
 			if (can && !counter) {
 				try {
+
+					if (tmp.lastIndexOf(')') === -1)
+						tmp += ')';
+
 					var r = (new Function('self', 'config', 'return ' + tmp))(controller, CONF).replace(REG_7, '\\\\').replace(REG_8, '\\\'');
 					if (r) {
 						txtindex = $VIEWCACHE.indexOf(r);
@@ -3386,7 +3394,7 @@ function existsSync(filename) {
 	}
 }
 
-function markup(body) {
+function markup(body, filename) {
 	body = body.ROOT();
 	var command = view_find_command(body, 0, true);
 	if (!command)
@@ -3433,7 +3441,7 @@ function markup(body) {
 			try {
 				r.push({ cmd: command.phrase, value: eval('(' + cmd + ')') });
 			} catch (e) {
-				console.log('A markup compilation error -->', cmd, e);
+				console.log('A markup compilation error -->', cmd, e, '"' + body.trim().max(0, 150) + '"', filename);
 			}
 		}
 

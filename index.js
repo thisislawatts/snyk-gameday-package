@@ -1186,7 +1186,7 @@ function Framework() {
 		email: new RegExp('^[a-zA-Z0-9-_.+]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$'),
 		url: /http(s)?:\/\/[^,{}\\]*$/i,
 		phone: /^[+]?[(]?[0-9]{3}[)]?[-\s.]?[0-9]{3}[-\s.]?[0-9]{4,8}$/im,
-		zip: /^\d{5}(?:[-\s]\d{4})?$/,
+		zip: /^[0-9a-z\-\s]{3,20}$/i,
 		uid: /^\d{14,}[a-z]{3}[01]{1}|^\d{9,14}[a-z]{2}[01]{1}a|^\d{4,18}[a-z]{2}\d{1}[01]{1}b|^[0-9a-f]{4,18}[a-z]{2}\d{1}[01]{1}c|^[0-9a-z]{4,18}[a-z]{2}\d{1}[01]{1}d$/
 	};
 
@@ -3941,7 +3941,7 @@ F.$filelocalize = function(req, res, nominify) {
 			return;
 		}
 
-		content = framework_internal.markup(F.translator(req.$language, framework_internal.modificators(content.toString(ENCODING), filename, 'static')));
+		content = framework_internal.markup(F.translator(req.$language, framework_internal.modificators(content.toString(ENCODING), filename, 'static')), filename);
 
 		Fs.lstat(filename, function(err, stats) {
 
@@ -8294,6 +8294,7 @@ F.listener = function(req, res) {
 	}
 
 	req.path = framework_internal.routeSplit(req.uri.pathname);
+
 	req.processing = 0;
 	req.isAuthorized = true;
 	req.xhr = headers['x-requested-with'] === 'XMLHttpRequest';
@@ -12525,7 +12526,6 @@ ControllerProto.transfer = function(url, flags) {
 		break;
 	}
 
-
 	if (!selected)
 		return false;
 
@@ -16127,7 +16127,6 @@ function websocket_onerror(e) {
 }
 
 function websocket_close() {
-	F.stats.performance.online--;
 	this.destroy && this.destroy();
 	this.$websocket.$onclose();
 }
@@ -16240,6 +16239,7 @@ function buffer_concat(buffers, length) {
 
 // MIT
 // Written by Jozef Gula
+// Optimized by Peter Sirka
 WebSocketClientProto.$parse = function() {
 
 	var self = this;
@@ -16429,9 +16429,11 @@ WebSocketClientProto.$onerror = function(err) {
 };
 
 WebSocketClientProto.$onclose = function() {
+
 	if (this._isClosed)
 		return;
 
+	F.stats.performance.online--;
 	this.isClosed = true;
 	this._isClosed = true;
 
@@ -17047,7 +17049,7 @@ function extend_request(PROTO) {
 			if (controller.isCanceled)
 				return;
 
-			if (this.$sgpkg_route.isCACHE && !F.temporary.other[this.uri.pathname])
+			if (!controller.isTransfer && this.$sgpkg_route.isCACHE && !F.temporary.other[this.uri.pathname])
 				F.temporary.other[this.uri.pathname] = this.path;
 
 			if (this.$sgpkg_route.isGENERATOR)
